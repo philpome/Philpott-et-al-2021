@@ -1,0 +1,146 @@
+library(countreg)
+library(pscl)
+library(colorspace)
+library(ggplot2)
+
+pubda <- read.csv("pubda2-NA-averaged.csv", header=TRUE)
+
+Gini<-pubda$GINI.index..World.Bank.estimate.
+Education<-pubda$Educational.attainment..at.least.completed.post.secondary..population.25...total......cumulative.
+Research<-pubda$Research.and.development.expenditure....of.GDP.
+GDP<-pubda$GDP..constant.2010.US..
+logGDP <- log(GDP)
+
+# Author representation analysis
+
+AR1nb<-hurdle(authorRepresentation ~ AvTD + log(GDP) + 
+                Gini + 
+                Education +
+                Research, 
+              dist = "negbin", zero.dist = "binomial", data = pubda)
+
+AR1poisson<-hurdle(authorRepresentation ~ AvTD + log(GDP) + 
+                     Gini + 
+                     Education +
+                     Research, 
+                   dist = "poisson", zero.dist = "binomial", data = pubda)
+
+AIC(AR1nb)
+AIC(AR1poisson)
+
+summary(AR1nb)
+
+qqrplot(AR1nb)
+rootogram(AR1nb)
+
+AR2<-hurdle(authorRepresentation ~ log(GDP) + Gini +
+              Education + Research | 
+              AvTD + log(GDP) + Gini + Education, 
+            dist = "negbin", data = pubda)
+AIC(AR1nb, AR2)
+
+# Author collaboration analysis
+
+collab1<-hurdle(collab ~ AvTD + log(GDP) + 
+                  Gini + 
+                  Education +
+                  Research, 
+                dist = "negbin", data = pubda)
+
+collab1poisson<-hurdle(collab ~ AvTD + log(GDP) + 
+                         Gini + 
+                         Education +
+                         Research, 
+                       dist = "poisson", data = pubda)
+AIC(collab1, collab1poisson)
+
+summary(collab1)
+
+collab2<-hurdle(collab ~ log(GDP) + Gini + Education + Research | AvTD + log(GDP) + Education + Research, dist = "negbin", data = pubda)
+AIC(collab1, collab2)
+
+qqrplot(collab1)
+rootogram(collab1)
+
+# Author mismatch analysis
+
+mismatch1<-hurdle(allMismatch ~ AvTD + log(GDP) + 
+                    Gini + 
+                    Education +
+                    Research, 
+                  dist = "negbin", data = pubda)
+
+mismatch1poisson<-hurdle(allMismatch ~ AvTD + log(GDP) + 
+                           Gini + 
+                           Education +
+                           Research, 
+                         dist = "poisson", data = pubda)
+AIC(mismatch1, mismatch1poisson)
+
+mismatch2<-hurdle(allMismatch ~ log(GDP) + Gini + Education + Research | AvTD + log(GDP) + Gini + Research, dist = "poisson", data = pubda)
+AIC(mismatch1, mismatch2)
+
+qqrplot(mismatch1)
+rootogram(mismatch1)
+
+# Figures
+
+library(gridExtra)
+library(ggpubr)
+
+# Author representation graphs
+
+p1 <- ggplot(pubda, aes(x=logGDP, y = authorRepresentation, color = AvTD)) + 
+  geom_point() +
+  theme_gray() +
+  labs(x="Log Average GDP (1980-2019)", y = "AR") +
+  scale_colour_continuous_sequential(palette = "Lajolla", trans = "reverse", na.value = "black") + 
+  geom_smooth(method=lm, color = "darkgoldenrod") +
+  geom_text(aes(label=ifelse(authorRepresentation>430,as.character(country),'')),hjust=1,vjust=1)
+
+p2 <- ggplot(pubda, aes(x=AvTD, y = authorRepresentation, color = logGDP)) + 
+  geom_point() +
+  theme_dark() +
+  labs(x="Average taxonomic distinctiveness", y = "AR") +
+  scale_colour_continuous_sequential(palette = "Dark Mint", na.value = "black") +
+  geom_text(aes(label=ifelse(authorRepresentation>430,as.character(country),'')),hjust=1,vjust=1)
+
+ar_plot <- grid.arrange(p1, p2)
+
+# Collaboration graphs
+
+p3 <- ggplot(pubda, aes(x=logGDP, y = collab, color = AvTD)) + 
+  geom_point() +
+  theme_gray() +
+  labs(x="Log average GDP (1980-2019)", y = "Collab.") +
+  scale_colour_continuous_sequential(palette = "Lajolla", na.value = "black") + 
+  geom_smooth(method=lm, color = "darkgoldenrod") + 
+  geom_text(aes(label=ifelse(collab>39,as.character(country),'')),hjust=1,vjust=1)
+
+p4 <- ggplot(pubda, aes(x=AvTD, y = collab, color = logGDP)) + 
+  geom_point() +
+  theme_dark() +
+  labs(x="Average taxonomic distinctiveness", y = "Collab.") +
+  scale_colour_continuous_sequential(palette = "Dark Mint", na.value = "black") + 
+  geom_text(aes(label=ifelse(collab>39,as.character(country),'')),hjust=1,vjust=1)
+
+c_plot <- grid.arrange(p3, p4)
+
+# Mismatch graphs
+
+p5 <- ggplot(pubda, aes(x=logGDP, y = allMismatch, color = AvTD)) + 
+  geom_point() +
+  theme_gray() +
+  labs(x="Log average GDP (1980-2019)", y = "Mismatches") +
+  scale_colour_continuous_sequential(palette = "Lajolla", trans = "reverse", na.value = "black") + 
+  geom_smooth(method=lm, color = "darkgoldenrod") + 
+  geom_text(aes(label=ifelse(allMismatch>45,as.character(country),'')),hjust=1,vjust=1)
+
+p6 <- ggplot(pubda, aes(x=AvTD, y = allMismatch, color = logGDP)) + 
+  geom_point() +
+  theme_dark() +
+  labs(x="Average taxonomic distinctiveness", y = "Mismatches") +
+  scale_colour_continuous_sequential(palette = "Dark Mint", na.value = "black") + 
+  geom_text(aes(label=ifelse(allMismatch>45,as.character(country),'')),hjust=1,vjust=1)
+
+m_plot <- grid.arrange(p5, p6)
